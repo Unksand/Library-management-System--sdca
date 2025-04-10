@@ -93,6 +93,11 @@ use Endroid\QrCode\Writer\ValidationException;
             margin-bottom: 20px;
         }
 
+        .qr-code-text {
+            margin-top: 10px;
+            text-align: center;
+        }
+
     </style>
 </head>
 <body>
@@ -220,65 +225,64 @@ use Endroid\QrCode\Writer\ValidationException;
                             </div>
                         </div>
 
-                        <!-- Update Button -->
-                        <button type="submit" name="update" class="btn btn-primary btn-block">Update</button>
-                        <a href="<?php echo site_url('Auth/manage_books'); ?>" class="btn btn-danger btn-block">Return to Manage Books</a>
-                    </form>
+                        <form method="post" enctype="multipart/form-data" action="<?php echo site_url('Auth/update_book'); ?>">
+                            <input type="hidden" name="book_id" value="<?php echo $book->id; ?>">
+                            <!-- Update Button -->
+                            <button type="submit" name="update" class="btn btn-primary btn-block">Update</button>
+                            <a href="<?php echo site_url('Auth/manage_books'); ?>" class="btn btn-danger btn-block">Return to Manage Books</a>
+                        </form>
 
-                    <!-- QR Code Preview -->
+                   <!-- QR Code Preview -->
                     <div class="form-group text-center">
                         <label for="generate_qr">QR Code Preview</label>
                         <div id="qr-preview" class="qr-code-container">
-                        <?php
-                            $writer = new PngWriter();
-                            //$categoryName = '';
-                            $authorName = '';
-                            $programName = '';
+                            <?php
+                                $writer = new PngWriter();
+                                $authorName = '';
+                                $programName = '';
 
-                            //foreach ($categories as $category) {
-                                //if ($category->id == $book->CatId) {
-                                    //$categoryName = $category->CategoryName;
-                                    //break;
-                               // }
-                            //}
-
-                            foreach ($authors as $author) {
-                                if ($author->id == $book->AuthorId) {
-                                    $authorName = $author->AuthorName;
-                                    break;
+                                foreach ($authors as $author) {
+                                    if ($author->id == $book->AuthorId) {
+                                        $authorName = $author->AuthorName;
+                                        break;
+                                    }
                                 }
-                            }
 
-                            foreach ($programs as $program) {
-                                if ($program->id == $book->ProgramID) {
-                                    $programName = $program->SchoolCourse;
-                                    break;
+                                foreach ($programs as $program) {
+                                    if ($program->id == $book->ProgramID) {
+                                        $programName = $program->SchoolCourse;
+                                        break;
+                                    }
                                 }
-                            }
 
-                            $qrCodeData = 'Book ID: ' . $book->id . "\nBook Name: " . $book->BookName . "\nISBN: " . $book->ISBNNumber . "\nContent Type: " . $book->ContentType . "\nPublisher: " . $book->Publisher . "\nAuthor: " . $authorName . "\nProgram: " . $programName . "\nBook Edition: " . $book->BookEdition . "\nBook Language: " . $book->BookLanguage . "\nTotal Pages: " . $book->TotalPages . "\nYear Published: " . $book->YearPublished . "\nPlace of Publication: " . $book->PlaceOfPublication . "\nNumber of Copies: " . $book->NumberOfCopies;
-                            $hashedQrCodeData = hash('sha256', $qrCodeData);
+                                $qrCodeData = 'Book ID: ' . $book->id . "\nBook Name: " . $book->BookName . "\nISBN: " . $book->ISBNNumber . "\nContent Type: " . $book->ContentType . "\nPublisher: " . $book->Publisher . "\nAuthor: " . $authorName . "\nProgram: " . $programName . "\nBook Edition: " . $book->BookEdition . "\nBook Language: " . $book->BookLanguage . "\nTotal Pages: " . $book->TotalPages . "\nYear Published: " . $book->YearPublished . "\nPlace of Publication: " . $book->PlaceOfPublication . "\nNumber of Copies: " . $book->NumberOfCopies;
+                                $qrText = $qrCodeData; // Define the $qrText variable
+                                $hashedQrCodeData = hash('sha256', $qrText);
 
-                            $qrCode = new QrCode($hashedQrCodeData);
-                            $qrCode->setEncoding(new Encoding('UTF-8'));
-                            $qrCode->setSize(300);
-                            $qrCode->setMargin(10);
-                            $qrCode->setForegroundColor(new Color(0, 0, 0));
-                            $qrCode->setBackgroundColor(new Color(255, 255, 255));
+                                $qrCode = new QrCode($hashedQrCodeData);
+                                $qrCode->setEncoding(new Encoding('UTF-8'));
+                                $qrCode->setSize(300);
+                                $qrCode->setMargin(10);
+                                $qrCode->setForegroundColor(new Color(0, 0, 0));
+                                $qrCode->setBackgroundColor(new Color(255, 255, 255));
 
-                            $result = $writer->write($qrCode);
-                            echo '<img src="/login/assets/qrcodes/book_' . $book->id . '.png">';
-                            $result->saveToFile('assets/qrcodes/book_' . $book->id . '.png');
-                        ?>
-
+                                $result = $writer->write($qrCode);
+                                echo '<img src="/login/assets/qrcodes/book_' . $book->id . '.png">';
+                                $result->saveToFile('assets/qrcodes/book_' . $book->id . '.png');
+                            ?>
+                        </div>
+                        <div class="qr-code-text">
+                            <p>Generated Hash Value: <?php echo $hashedQrCodeData; ?></p>
                         </div>
                         <div class="text-center">
                             <button id="generate-qr" class="btn btn-primary">Generate QR Code</button>
                             <button id="delete-qr" class="btn btn-danger">Delete QR Code</button>
                         </div>
                         <input type="hidden" id="book-id" value="<?php echo $book->id; ?>">
-                        <input type="hidden" id="hashed-qr-code-data" value="<?php echo $hashedQrCodeData; ?>">
+                        <input type="hidden" id="hashed-qr-code-data" name="hashed_qr_code_data" value="<?php echo $hashedQrCodeData; ?>">
+                        <input type="hidden" name="qr_code_data" value="<?php echo $qrCodeData; ?>">
                     </div>
+
                 </div>
             </div>
         </div>
@@ -287,58 +291,79 @@ use Endroid\QrCode\Writer\ValidationException;
     <script src="<?php echo site_url(); ?>assets/js/jquery-1.10.2.js"></script>
     <script src="<?php echo site_url(); ?>assets/js/bootstrap.js"></script>
     <script>
-    $(document).ready(function () {
+        $(document).ready(function () {
         $('#generate-qr').on('click', function () {
-        const bookName = $('#bookname').val();
-        const isbn = $('#isbn').val();
-        const contentType = $('#content-type').val();
-        const publisher = $('#publisher').val();
-        const author = $('#author').val();
-        const program = $('#program').val();
-        const bookId = $('#book-id').val();
-        const bookEdition = $('#bookedition').val();
-        const bookLanguage = $('#booklanguage').val();
-        const totalPages = $('#totalpages').val();
-        const yearPublished = $('#yearpublished').val();
-        const placeOfPublication = $('#placeofpublication').val();
-        const numberOfCopies = $('#numberofcopies').val();
+            const bookName = $('#bookname').val();
+            const isbn = $('#isbn').val();
+            const contentType = $('#content-type').val();
+            const publisher = $('#publisher').val();
+            const author = $('#author').val();
+            const program = $('#program').val();
+            const bookId = $('#book-id').val();
+            const bookEdition = $('#bookedition').val();
+            const bookLanguage = $('#booklanguage').val();
+            const totalPages = $('#totalpages').val();
+            const yearPublished = $('#yearpublished').val();
+            const placeOfPublication = $('#placeofpublication').val();
+            const numberOfCopies = $('#numberofcopies').val();
 
-        if (!bookName || !isbn || !contentType || !publisher || !category || !author || !program) {
-            alert('Please fill in all fields before generating the QR code.');
-            return;
-        }
-
-        const qrData = JSON.stringify({
-            BookID: bookId,
-            BookName: bookName,
-            ISBN: isbn,
-            ContentType: contentType,
-            Publisher: publisher,
-            AuthorID: author,
-            ProgramID: program,
-            BookEdition: bookEdition,
-            BookLanguage: bookLanguage,
-            TotalPages: totalPages,
-            YearPublished: yearPublished,
-            PlaceOfPublication: placeOfPublication,
-            NumberOfCopies: numberOfCopies,
-        });
-
-    const qrCodePath = 'assets/qrcodes/book_' + bookId + '.png';
-
-    $.ajax({
-        type: 'POST',
-        url: '<?php echo site_url('Auth/generate_qr_code'); ?>',
-        data: { qr_data: qrData, qr_code_path: qrCodePath },
-        success: function (response) {
-            if (response.success) {
-                $('#qr-preview').html('<img src="<?php echo base_url('assets/qrcodes/book_' . $book->id . '.png'); ?>" alt="QR Code">');
-            } else {
-                alert('Failed to generate QR code.');
+            if (!bookName || !isbn || !contentType || !publisher || !category || !author || !program) {
+                alert('Please fill in all fields before generating the QR code.');
+                return;
             }
-        }
+
+            const qrData = JSON.stringify({
+                BookID: bookId,
+                BookName: bookName,
+                ISBN: isbn,
+                ContentType: contentType,
+                Publisher: publisher,
+                AuthorID: author,
+                ProgramID: program,
+                BookEdition: bookEdition,
+                BookLanguage: bookLanguage,
+                TotalPages: totalPages,
+                YearPublished: yearPublished,
+                PlaceOfPublication: placeOfPublication,
+                NumberOfCopies: numberOfCopies,
+            });
+
+            const qrText = 'Book ID: ' + bookId + "\n";
+            qrText += 'Book Name: ' + bookName + "\n";
+            qrText += 'ISBN: ' + isbn + "\n";
+            qrText += 'Content Type: ' + contentType + "\n";
+            qrText += 'Publisher: ' + publisher + "\n";
+            qrText += 'Author: ' + author + "\n";
+            qrText += 'Program: ' + program + "\n";
+            qrText += 'Book Edition: ' + bookEdition + "\n";
+            qrText += 'Book Language: ' + bookLanguage + "\n";
+            qrText += 'Total Pages: ' + totalPages + "\n";
+            qrText += 'Year Published: ' + yearPublished + "\n";
+            qrText += 'Place of Publication: ' + placeOfPublication + "\n";
+            qrText += 'Number of Copies: ' + numberOfCopies;
+
+            const hashedQrCodeData = $('#hashed-qr-code-data').val();
+            const qrCodePath = 'assets/qrcodes/book_' + bookId + '.png';
+
+            $.ajax({
+                type: 'POST',
+                url: '<?php echo site_url('Auth/generate_qr_code'); ?>',
+                data: { 
+                    qr_data: qrData, 
+                    qr_code_path: qrCodePath, 
+                    hashed_qr_code_data: hashedQrCodeData, 
+                    book_id: bookId 
+                },
+                success: function (response) {
+                    if (response.success) {
+                        $('#qr-preview').html('<img src="<?php echo base_url('assets/qrcodes/book_' . $book->id . '.png'); ?>" alt="QR Code">');
+                    } else {
+                        alert('Failed to generate QR code.');
+                    }
+                }
+            });
+        });
     });
-});
 
     $('#author').on('keyup', function () {
         const authorName = $(this).val();
@@ -386,7 +411,6 @@ use Endroid\QrCode\Writer\ValidationException;
             }
         });
     }
-    });
     });
     </script>
 </body>

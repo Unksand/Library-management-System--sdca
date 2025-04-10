@@ -61,6 +61,7 @@ $route['auth/add_author'] = 'Auth/add_author';
 $route['auth/manage_authors'] = 'Auth/manage_authors';
 $route['Auth/edit-author/(:num)'] = 'Auth/edit_author/$1';
 $route['auth/add_book'] = 'Auth/add_book';
+$route['auth/search_books'] = 'Auth/search_books';
 $route['auth/manage_books'] = 'Auth/manage_books';
 $route['auth/issue_book'] = 'Auth/issue_book';
 $route['auth/manage_issued_books'] = 'Auth/manage_issued_books';

@@ -111,6 +111,24 @@
                 </div>
             </div>
 
+            <!-- Search Bar -->
+            <div class="row">
+                <div class="col-md-12 text-center">
+                    <form action="<?= base_url('auth/search_books') ?>" method="get">
+                        <div class="form-group">
+                            <label for="search">Search for a book:</label>
+                            <select name="search_field" class="form-control">
+                                <option value="book_name">Book Name</option>
+                                <option value="author">Author</option>
+                                <option value="isbn_number">ISBN Number</option>
+                            </select>
+                            <input type="text" name="search" placeholder="Enter search term..." class="form-control">
+                            <button type="submit" class="btn btn-primary">Search</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <div class="dashboard-content">
                 <!-- Widgets Section -->
                 <div class="dashboard-widgets">

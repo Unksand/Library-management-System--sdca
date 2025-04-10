@@ -111,13 +111,24 @@ class Auth extends CI_Controller
 
     public function analytics()
     {
-    $data['books_count'] = $this->Analytics_model->get_books_count();
-    $data['not_returned_count'] = $this->Analytics_model->get_not_returned_count();
-    $data['staff_count'] = $this->Dashboard_model->get_staff_count();
-    $data['author_count'] = $this->Analytics_model->get_author_count();
-    $data['category_count'] = $this->Analytics_model->get_category_count();
+        $data['books_count'] = $this->Analytics_model->get_books_count();
+        $data['not_returned_count'] = $this->Analytics_model->get_not_returned_count();
+        $data['staff_count'] = $this->Dashboard_model->get_staff_count();
+        $data['author_count'] = $this->Analytics_model->get_author_count();
+        $data['category_count'] = $this->Analytics_model->get_category_count();
 
-    $this->load->view('Auth/analytics', $data);
+        $this->load->view('Auth/analytics', $data);
+    }
+
+    // Auth controller
+    public function search_books()
+    {
+        $search_term = $this->input->get('search', true);
+        $search_field = $this->input->get('search_field', true);
+        $this->load->model('Book_model');
+        $results = $this->Book_model->search_books($search_term, $search_field);
+        $data['results'] = $results;
+        $this->load->view('Auth/search-results', $data); // Update the file name here
     }
 
     public function manage_books()
@@ -182,25 +193,21 @@ class Auth extends CI_Controller
         $data['sort_order'] = $sort_order;
 
         $this->load->view('Auth/manage-books', $data);
-        $this->Book_model->update_old_books();
     }
 
     public function add_book() {
         $this->load->model('Book_model');
-         //$this->load->model('Category_model');
         $this->load->model('Author_model');
         $this->load->model('Program_model'); // Load the Program_model
     
         // Fetch authors and programs for the dropdown
         $data['authors'] = $this->Author_model->get_all_authors();
-         //$data['categories'] = $this->Category_model->get_all_categories();
         $data['programs'] = $this->Program_model->get_all_programs();
     
         if ($this->input->post()) {
             $bookData = [
                 'BookName' => $this->input->post('bookname', true),
                 'AuthorId' => $this->input->post('author', true),
-                //'CatId' => $this->input->post('category'),
                 'Publisher' => $this->input->post('publisher', true),
                 'ISBNNumber' => $this->input->post('isbn', true),
                 'ContentType' => $this->input->post('contenttype', true),
@@ -236,62 +243,68 @@ class Auth extends CI_Controller
             $qrCodeData = $this->input->post('qrcode_data', true);
             if (!empty($qrCodeData)) {
                 $this->load->library('ciqrcode'); // Load the Ciqrcode library
-    
+
                 // Define the file name and path for the QR Code
                 $qrCodeFileName = time() . '_qr.png';
                 $qrCodePath = './uploads/' . $qrCodeFileName;
-    
+
                 $params = [
                     'data' => $qrCodeData,
                     'level' => 'H', // Error correction level
                     'size' => 10,   // QR code size
                     'savename' => $qrCodePath, // Save QR code to this path
                 ];
-    
+
                 try {
                     $this->ciqrcode->generate($params); // Generate the QR code
                     $bookData['QRCodeImage'] = $qrCodeFileName; // Save the filename in the database
+
+                    // Hash the QR code image information
+                    $book = $this->Book_model->get_book_by_id($book_id);
+                    $author = $this->Author_model->get_author_by_id($book->AuthorId);
+                    $program = $this->Program_model->get_program_by_id($book->ProgramID);
+
+                    $qr_text = '';
+                    $qr_text .= 'Book ID: ' . $book->id . "\n";
+                    $qr_text .= 'Book Name: ' . $book->BookName . "\n";
+                    $qr_text .= 'ISBN: ' . $book->ISBNNumber . "\n";
+                    $qr_text .= 'Content Type: ' . $book->ContentType . "\n";
+                    $qr_text .= 'Publisher: ' . $book->Publisher . "\n";
+                    $qr_text .= 'Author: ' . $author->AuthorName . "\n";
+                    $qr_text .= 'Program: ' . $program->SchoolCourse . "\n";
+                    $qr_text .= 'Book Edition: ' . $book->BookEdition . "\n";
+                    $qr_text .= 'Book Language: ' . $book->BookLanguage . "\n";
+                    $qr_text .= 'Total Pages: ' . $book->TotalPages . "\n";
+                    $qr_text .= 'Year Published: ' . $book->YearPublished . "\n";
+                    $qr_text .= 'Place of Publication: ' . $book->PlaceOfPublication;
+
+                    $hashed_qr_code_image_text = hash('sha256', $qr_text);
+                    $bookData['HashedQRCodeImageText'] = $hashed_qr_code_image_text;
                 } catch (Exception $e) {
                     $this->session->set_flashdata('error', 'Failed to generate QR Code: ' . $e->getMessage());
                     redirect('auth/add_book');
                 }
             }
-
-            $data = array(
-                'BookName' => 'Example Book',
-                'QRCodeImage' => 'example_qr_code_image.png',
-                // Other book data...
-            );
-            
-            $book_id = $this->Book_model->insert_book($data);
     
             // Insert the book data into the database
-            if ($this->Book_model->insert_book($bookData)) {
-                // Hash the QR code image information
-                $hashed_qr_code_image_text = hash('sha256', $qrCodeData);
-                
-                // Update the book data with the hashed QR code image information
-                $update_data = [
-                    'HashedQRCodeImageText' => $hashed_qr_code_image_text
-                ];
-                $this->Book_model->update_book($this->Book_model->insert_id(), $update_data);
-                
+            $book_id = $this->Book_model->insert_book($bookData);
+    
+            if ($book_id) {
                 $this->session->set_flashdata('success', 'Book added successfully!');
             } else {
                 $this->session->set_flashdata('error', 'Failed to add the book.');
             }
-            
+    
             redirect('auth/add_book');
         }
     
         $this->load->view('Auth/add-book', $data);
     }
-
-    // Edit book details
+    
     public function edit_book($id) {
         $this->load->model(['Book_model', 'Author_model', 'Program_model']); //'Category_model'
         $this->load->library(['form_validation']);
-        
+                
         $this->form_validation->set_rules('bookname', 'Book Name', 'required');
         //$this->form_validation->set_rules('category', 'Category', 'required');
         $this->form_validation->set_rules('author', 'Author', 'required|callback_validate_author');
@@ -304,7 +317,7 @@ class Auth extends CI_Controller
         $this->form_validation->set_rules('totalpages', 'Total Pages', 'required|numeric');
         $this->form_validation->set_rules('yearpublished', 'Year Published', 'required|numeric');
         $this->form_validation->set_rules('placeofpublication', 'Place of Publication', 'required');
-        
+                
         if ($this->form_validation->run() == TRUE) {
             // Upload image
             if ($_FILES['bookImage']['name'] != '') {
@@ -312,20 +325,33 @@ class Auth extends CI_Controller
                 $config['allowed_types'] = 'gif|jpg|png';
                 $config['max_size'] = 2048;
                 $config['remove_space'] = TRUE;
-        
+                    
                 $this->load->library('upload', $config);
-        
+                    
                 if (!$this->upload->do_upload('bookImage')) {
                     $error = array('error' => $this->upload->display_errors());
                     $this->session->set_flashdata('error', 'Failed to upload image.');
                 } else {
                     $data = array('upload_data' => $this->upload->data());
                     $bookImage = $data['upload_data']['file_name'];
+                    
+                    // Delete the old QR Code image
+                    $old_qr_code_image = $this->input->post('old_qr_code_image', true);
+                    if ($old_qr_code_image != '') {
+                        $qr_code_path = './uploads/' . $old_qr_code_image;
+                        if (file_exists($qr_code_path)) {
+                            unlink($qr_code_path);
+                        }
+                    }
+                    
+                    // Delete the old hashed QR Code image text
+                    $this->db->where('id', $id);
+                    $this->db->update('tblbooks', ['HashedQRCodeImageText' => '']);
                 }
             } else {
                 $bookImage = $this->input->post('old_book_image', true);
             }
-        
+                    
             // Update book data
             $data = [
                 'BookName' => $this->input->post('bookname', true),
@@ -343,7 +369,7 @@ class Auth extends CI_Controller
                 'PlaceOfPublication' => $this->input->post('placeofpublication', true),
                 'NumberOfCopies' => (int)$this->input->post('numberofcopies'),
             ];
-        
+                    
             $authorName = $this->input->post('author', true);
             $author = $this->Author_model->get_author_by_name($authorName);
             if ($author) {
@@ -353,20 +379,48 @@ class Auth extends CI_Controller
                 $authorId = $this->Author_model->add_author($authorName);
                 $data['AuthorId'] = $authorId;
             }
+                    
+            // Handle QR code generation
+            $book = $this->Book_model->get_book_by_id($id);
+            $author = $this->Author_model->get_author_by_id($book->AuthorId);
+            $program = $this->Program_model->get_program_by_id($book->ProgramID);
+            $hashed_qr_code_image_text = $this->input->post('hashed_qr_code_data', true);
 
+            $qrCodeData = 'Book ID: ' . $id . "\n";
+            $qrCodeData .= 'Book Name: ' . $this->input->post('bookname', true) . "\n";
+            $qrCodeData .= 'ISBN: ' . $this->input->post('isbn', true) . "\n";
+            $qrCodeData .= 'Content Type: ' . $this->input->post('content-type', true) . "\n";
+            $qrCodeData .= 'Publisher: ' . $this->input->post('publisher', true) . "\n";
+            $qrCodeData .= 'Author: ' . $this->input->post('author', true) . "\n";
+            $qrCodeData .= 'Program: ' . $this->input->post('program', true) . "\n";
+            $qrCodeData .= 'Book Edition: ' . $this->input->post('bookedition', true) . "\n";
+            $qrCodeData .= 'Book Language: ' . $this->input->post('booklanguage', true) . "\n";
+            $qrCodeData .= 'Total Pages: ' . $this->input->post('totalpages', true) . "\n";
+            $qrCodeData .= 'Year Published: ' . $this->input->post('yearpublished', true) . "\n";
+            $qrCodeData .= 'Place of Publication: ' . $this->input->post('placeofpublication', true) . "\n";
+            $qrCodeData .= 'Number of Copies: ' . $this->input->post('numberofcopies', true);
+
+            // Get the hashed QR code image text from the edit-book.php file
             $hashed_qr_code_image_text = hash('sha256', $qrCodeData);
+
+            // Update the hashed QR code image text in the database
             $data['HashedQRCodeImageText'] = $hashed_qr_code_image_text;
-        
-            if ($this->Book_model->update_book($id, $data)) {
+                    
+            // Update the book data
+            $this->db->where('id', $id);
+            $this->db->update('tblbooks', $data);
+                    
+            // Check if the update was successful
+            if ($this->db->affected_rows() > 0) {
                 $this->session->set_flashdata('msg', 'Book updated successfully!');
             } else {
                 $this->session->set_flashdata('error', 'Failed to update the book.');
             }
-        
+                    
             // Redirect to manage-books page
             redirect('Auth/manage_books');
         }
-        
+                    
         // Load view with data
         $data = [
             'book' => $this->Book_model->get_book_by_id($id),
@@ -375,6 +429,58 @@ class Auth extends CI_Controller
             'programs' => $this->Program_model->get_all_programs(),
         ];
         $this->load->view('Auth/edit-book', $data);
+    }
+
+    public function update_book() {
+        // Update the book information
+        $hashedQrCodeData = $this->input->post('hashed_qr_code_data');
+        $book_id = $this->input->post('book_id');
+        $data = array(
+            'BookName' => $this->input->post('bookname'),
+            'ISBNNumber' => $this->input->post('isbn'),
+            'ContentType' => $this->input->post('content-type'),
+            'Publisher' => $this->input->post('publisher'),
+            'AuthorName' => $this->input->post('author'),
+            'ProgramID' => $this->input->post('program'),
+            'BookEdition' => $this->input->post('bookedition'),
+            'BookLanguage' => $this->input->post('booklanguage'),
+            'TotalPages' => $this->input->post('totalpages'),
+            'YearPublished' => $this->input->post('yearpublished'),
+            'PlaceOfPublication' => $this->input->post('placeofpublication'),
+            'NumberOfCopies' => $this->input->post('numberofcopies')
+        );
+    
+        $this->db->where('id', $book_id);
+        $this->db->update('tblbooks', $data);
+    
+        // Update the hashed QR code image text in the database
+        $hashed_qr_code_path = 'assets/qrcodes/book_' . $book_id . '.png';
+    
+        $qr_text = 'Book ID: ' . $book_id . "\n";
+        $qr_text .= 'Book Name: ' . $this->input->post('bookname') . "\n";
+        $qr_text .= 'ISBN: ' . $this->input->post('isbn') . "\n";
+        $qr_text .= 'Content Type: ' . $this->input->post('content-type') . "\n";
+        $qr_text .= 'Publisher: ' . $this->input->post('publisher') . "\n";
+        $qr_text .= 'Author: ' . $this->input->post('author') . "\n";
+        $qr_text .= 'Program: ' . $this->input->post('program') . "\n";
+        $qr_text .= 'Book Edition: ' . $this->input->post('bookedition') . "\n";
+        $qr_text .= 'Book Language: ' . $this->input->post('booklanguage') . "\n";
+        $qr_text .= 'Total Pages: ' . $this->input->post('totalpages') . "\n";
+        $qr_text .= 'Year Published: ' . $this->input->post('yearpublished') . "\n";
+        $qr_text .= 'Place of Publication: ' . $this->input->post('placeofpublication') . "\n";
+        $qr_text .= 'Number of Copies: ' . $this->input->post('numberofcopies');
+    
+        $hashed_qr_code_data = hash('sha256', $qr_text);
+    
+        // Only update the hashed QR code image text if the QR code data is not empty
+        if (!empty($this->input->post('qrcode_data'))) {
+            $this->db->where('id', $book_id);
+            $this->db->update('tblbooks', array('HashedQRCodeImageText' => $hashed_qr_code_data));
+        }
+    
+        // Redirect to manage books page
+        $this->session->set_flashdata('msg', 'Book updated successfully!');
+        redirect('Auth/manage_books');
     }
 
     public function delete_book($id)
@@ -429,17 +535,17 @@ class Auth extends CI_Controller
     public function generate_qr_code() {
         $qr_data = $this->input->post('qr_data', true);
         $qr_code_path = $this->input->post('qr_code_path', true);
-    
-        $qr_code = json_decode($qr_data, true);
+        $book_id = $this->input->post('book_id', true);
+        $hashed_qr_code_data = $this->input->post('hashed_qr_code_data', true);
     
         $authorName = '';
         $programName = '';
     
         //foreach ($this->Category_model->get_all_categories() as $category) {
-            //if ($category->id == $qr_code['CategoryID']) {
-                //$categoryName = $category->CategoryName;
-                //break;
-           // }
+        //    if ($category->id == $qr_code['CategoryID']) {
+        //        $categoryName = $category->CategoryName;
+        //        break;
+        //    }
         //}
     
         foreach ($this->Author_model->get_all_authors() as $author) {
@@ -456,12 +562,16 @@ class Auth extends CI_Controller
             }
         }
     
+        $qr_code = json_decode($qr_data, true);
+        $qr_text = '';
+        foreach ($qr_code as $key => $value) {
+            $qr_text .= $key . ': ' . $value . "\n";
+        }
         $qr_text = 'Book ID: ' . $qr_code['BookID'] . "\n";
         $qr_text .= 'Book Name: ' . $qr_code['BookName'] . "\n";
         $qr_text .= 'ISBN: ' . $qr_code['ISBN'] . "\n";
         $qr_text .= 'Content Type: ' . $qr_code['ContentType'] . "\n";
         $qr_text .= 'Publisher: ' . $qr_code['Publisher'] . "\n";
-        //$qr_text .= 'Category: ' . $categoryName . "\n";
         $qr_text .= 'Author: ' . $authorName . "\n";
         $qr_text .= 'Program: ' . $programName . "\n";
         $qr_text .= 'Book Edition: ' . $qr_code['BookEdition'] . "\n";
@@ -469,14 +579,18 @@ class Auth extends CI_Controller
         $qr_text .= 'Total Pages: ' . $qr_code['TotalPages'] . "\n";
         $qr_text .= 'Year Published: ' . $qr_code['YearPublished'] . "\n";
         $qr_text .= 'Place of Publication: ' . $qr_code['PlaceOfPublication'];
-
+    
+        echo "QR Text: " . $qr_text . "\n";
+    
         $hashed_qr_code_image_text = hash('sha256', $qr_text);
     
+        echo "Hashed QR Code Image Text: " . $hashed_qr_code_image_text . "\n";
+    
         // Update the book data with the hashed QR code image information
-        $update_data = [
-            'HashedQRCodeImageText' => $hashed_qr_code_image_text
-        ];
-        $this->Book_model->update_book($book_id, $update_data);
+        $book_id = $this->input->post('book_id');
+        $hashed_qr_code_path = 'assets/qrcodes/book_' . $book_id . '.png';
+        $this->db->where('id', $book_id);
+        $this->db->update('tblbooks', array('HashedQRCodeImage' => $qr_code_path, 'HashedQRCodeImageText' => $hashed_qr_code_image_text));
     
         $qrCode = (new Endroid\QrCode\QrCodeBuilder())
             ->setText($qr_text)
@@ -491,29 +605,31 @@ class Auth extends CI_Controller
     
         echo json_encode(['success' => true]);
     }
-    
+
+    // Delete QR code
     public function delete_qr_code() {
         $qr_code_path = $this->input->post('qr_code_path', true);
         $hashed_qr_code_data = $this->input->post('hashed_qr_code_data', true);
         $book_id = $this->input->post('book_id', true);
-    
-        if (file_exists(FCPATH . $qr_code_path)) {
-            if (unlink(FCPATH . $qr_code_path)) {
-                $response = array('success' => true, 'message' => 'QR code deleted successfully.');
-            } else {
-                $response = array('success' => false, 'error' => 'Failed to delete QR code.');
-            }
-        } else {
-            $response = array('success' => false, 'error' => 'QR code file not found.');
+
+        // Delete the QR code image file
+        if (file_exists($qr_code_path)) {
+            unlink($qr_code_path);
         }
-    
+
+        // Update the book data to remove the QR code image information
         $update_data = [
-            'HashedQRCodeImageText' => '',
-            'QRCodeImage' => ''
+            'QRCodeImage' => '',
+            'HashedQRCodeImageText' => ''
         ];
-        $this->Book_model->update_book($book_id, $update_data);
-    
-        echo json_encode($response);
+        $this->db->where('id', $book_id);
+        $this->db->update('tblbooks', $update_data);
+
+        if ($this->db->affected_rows() > 0) {
+            echo json_encode(['success' => true, 'message' => 'QR code deleted successfully!']);
+        } else {
+            echo json_encode(['error' => 'Failed to delete QR code.']);
+        }
     }
 
     public function add_category()

@@ -62,18 +62,7 @@ class Book_model extends CI_Model {
         }
         
         $this->db->where('id', $id);
-        return $this->db->update('tblbooks', $data);
-    }
-
-    public function update_old_books() {
-        $books = $this->get_all_books();
-        foreach ($books as $book) {
-            $hashed_qr_code_image_text = hash('sha256', $book->QRCodeImage);
-            $update_data = [
-                'HashedQRCodeImageText' => $hashed_qr_code_image_text
-            ];
-            $this->update_book($book->id, $update_data);
-        }
+        return $this->db->update('tblbooks', $data) === TRUE;
     }
     
     // Delete book
@@ -86,12 +75,6 @@ class Book_model extends CI_Model {
     public function addBook($data) {
         $this->db->insert('tblbooks', $data);
         return $this->db->insert_id(); // Return inserted book ID for QR code handling
-    }
-    
-    // Update QR code path or any other specific field for the book
-    public function updateBook($book_id, $data) {
-        $this->db->where('id', $book_id);
-        return $this->db->update('tblbooks', $data);
     }
     
     // Get book details with QR code (if needed separately for QR code validation/display)
@@ -139,7 +122,7 @@ class Book_model extends CI_Model {
     }
     $this->db->limit($limit, $offset);
     return $this->db->get()->result();
-}
+    }
     
     public function count_all_books()
     {
@@ -162,5 +145,29 @@ class Book_model extends CI_Model {
         $this->db->join('tblcategory', 'tblcategory.id = tblbooks.CatId', 'left');
         $this->db->join('tblprograms', 'tblprograms.id = tblbooks.ProgramID', 'left');
         return $this->db->get()->num_rows();
+    }
+
+    // Book_model.php
+    public function search_books($search_term, $search_field)
+    {
+        if ($search_field == 'book_name') {
+            $this->db->like('BookName', $search_term);
+        } elseif ($search_field == 'author') {
+            $this->db->like('AuthorName', $search_term);
+        } elseif ($search_field == 'isbn_number') {
+            $this->db->like('ISBNNumber', $search_term);
+        }
+        
+        $this->db->select('
+            tblbooks.id, 
+            tblbooks.BookName, 
+            tblbooks.ISBNNumber, 
+            tblbooks.bookImage, 
+            tblauthors.AuthorName
+        ');
+        $this->db->from('tblbooks');
+        $this->db->join('tblauthors', 'tblauthors.id = tblbooks.AuthorId', 'left');
+        $query = $this->db->get();
+        return $query->result();
     }
 }
